@@ -1,0 +1,581 @@
+---
+title: "Using themes in ggplot2"
+subtitle: "Customise plots in R.<br />NHSE-R drop in session"
+author: "Pablo Leon |pablo.leonrodenas@nhs.net"
+date: "`r Sys.Date()`"
+format:
+  revealjs: 
+    slide-number: true
+    chalkboard: 
+      buttons: false
+    preview-links: auto
+    logo: images/quarto.png
+    css: styles.css
+    footer: <https://github.com/Pablo-source>
+resources:
+  - demo.pdf
+---
+
+## Intro
+
+This presentation shows how to format ggplot2 plots and how to use themes. We will use AE data downloaded from NHSE website, today we will cover:
+
+-   Change geom() used to build plot
+-   Include themes in ggplot charts
+-   Change background and plot fonts
+-   Include annotations
+-   Save plots as .png files
+
+As an introduction to ggplot2 customization, then you can explore plenty of options
+
+## Download our A&E data {auto-animate="true"}
+
+Using **utils** library we can download A&E Time Series data Excel file from NHS England website
+
+```{r echo=TRUE}
+# load required libraries ()
+library(readxl)
+library(here)
+library(dplyr)
+library(janitor)
+
+## Download AE data 
+AE_data_download <- function() {
+  
+  if(!dir.exists("data")){dir.create("data")}
+  
+  # England-level time series
+  # Download Excel file to a Project sub-folder called "data"
+  # Created previously using an adhoc project structure function
+  
+  xlsFile = "AE_England_data.xls"
+  
+  download.file(
+    url = 'https://www.england.nhs.uk/statistics/wp-content/uploads/sites/2/2019/11/Timeseries-monthly-Unadjusted-9kidr.xls',
+    destfile = here("data",xlsFile),
+    mode ="wb"
+  )
+  
+}
+# Download A&E data function (no arguments)
+AE_data_download()
+```
+
+## Import data into R
+
+Using **radxl** package we import the AE data into R, also package **here** is used to build relative paths.
+
+```{r echo=TRUE}
+AE_tabs <- excel_sheets(here("data","AE_England_data.xls"))
+AE_data<- read_excel(
+                     here("data", "AE_England_data.xls"), 
+                     sheet = 1, skip =17) %>% 
+                     clean_names()
+AE_data
+```
+
+## Subset data and create first plot
+
+Using **read_excel()** function to import Excel file, combined with **clean_names()** to obtain formatted variable names
+
+::: columns
+::: {.column width="40%"}
+```{r echo=TRUE}
+AE_data_subset<- read_excel(
+                      here("data", "AE_England_data.xls"), 
+                      sheet = 1, skip =17) %>% 
+                      clean_names() %>% 
+                      select(
+                        "x1",                                                                      
+                        "period",                                                                  
+                        "type_1_departments_major_a_e",                                            
+                        "type_2_departments_single_specialty",                                     
+                        "type_3_departments_other_a_e_minor_injury_unit",                          
+                        "total_attendances" 
+                      ) %>% 
+                    # Re-name variables 
+  select(
+                  period,
+                  type_1_Major_att = type_1_departments_major_a_e,
+                  type_2_Single_esp_att = type_2_departments_single_specialty,
+                  type_3_other_att = type_3_departments_other_a_e_minor_injury_unit,
+                  total_att = total_attendances
+                  
+                ) %>% 
+  mutate(Period = as.Date(period,tz="London"),tz="London")
+AE_data_subset
+AEATT_plot <- AE_data_subset
+```
+:::
+
+::: {.column width="60%"}
+```{r echo=TRUE}
+library(ggplot2)
+TypeI_att_plot <- AEATT_plot %>% select(period, type_1_Major_att) %>% 
+                  ggplot(aes(x = period, y = type_1_Major_att )) + geom_line() +
+                  labs(title = "A&E Attendances in England: Type 1 Departments - Major A&E, 2010-2019",
+                  subtitle ="Source: https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/")
+TypeI_att_plot
+```
+:::
+:::
+
+We are going to improve this plot by adding several formatting options
+
+## Improving original ggplot2 plot
+
+-   Combine a line and dot chart
+-   Add some color changing line size and type
+-   Modify X and Y axis labels
+-   Remove tick marks
+-   Include themes (https://ggplot2.tidyverse.org/reference/ggtheme.html)
+-   Modify continuous Y axis
+-   Add a smooth line to the line chart
+-   Format Title and Sub title
+
+## Combine a line and dot chart
+
+::: columns
+::: {.column width="40%"}
+``` {.r code-line-numbers="2-3"}
+                  ggplot(aes(x = period, y = type_1_Major_att )) +
+                  geom_line() +
+                  geom_point() +
+```
+
+Combine **geom_line()** and **geom_point()** to build a line and dot chart
+:::
+
+::: {.column width="60%"}
+```{r echo=TRUE}
+TypeI_att_plot <- AEATT_plot %>% 
+                  select(period, type_1_Major_att) %>% 
+                  ggplot(aes(x = period, y = type_1_Major_att )) +
+                  geom_line() +
+                  geom_point() +
+                  labs(title = "A&E Attendances in England: Type 1 Major A&E, 2010-2019",
+                       subtitle ="Source: https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/")
+
+TypeI_att_plot
+```
+:::
+:::
+
+## Change color and line type
+
+We can add **colour** to lines and add Title, subtitle and caption elements to the plot
+
+::: columns
+::: {.column width="40%"}
+``` {.r code-line-numbers="2-4"}
+                  ggplot(aes(x = period, y = type_1_Major_att)) +
+                  geom_line(color="#0072CE", size=1,  linetype=1) +
+                  # Included new geom
+                  geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+```
+
+Combine **geom_line()** and **geom_point()** to build a line and dot chart. Look Craig's style guide for NHS colours)
+:::
+
+::: {.column width="60%"}
+```{r echo=TRUE}
+TypeI_dot_line_plot <- AEATT_plot %>% 
+                  select(period, type_1_Major_att) %>% 
+                  ggplot(aes(x = period, y = type_1_Major_att)) +
+                  geom_line(color="#0072CE", size=1,  linetype=1) +
+                  # Included new geom
+                  geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+                  labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/")
+
+TypeI_dot_line_plot
+```
+:::
+:::
+
+## Modify X and Y axis labels
+
+Using **labs** function, we can modify content and appearance of text elements in the plot area
+
+``` {.r code-line-numbers="7-9"}
+Axis_labels_plot <- AEATT_plot %>% 
+                          select(period, type_1_Major_att) %>% 
+                          ggplot(aes(x = period, y = type_1_Major_att)) +
+                          geom_line(color="#0072CE", size=1,  linetype=1) +
+                          # Included new geom
+                          geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               # Change X and Y axis labels
+                               x = "Years", 
+                               y = "Type I Attendances") 
+                          
+Axis_labels_plot
+```
+
+## Modify X and Y axis labels
+
+Using **labs** function, we can modify content and appearance of text elements in the plot area
+
+```{r echo=FALSE}
+Axis_labels_plot <- AEATT_plot %>% 
+                          select(period, type_1_Major_att) %>% 
+                          ggplot(aes(x = period, y = type_1_Major_att)) +
+                          geom_line(color="#0072CE", size=1,  linetype=1) +
+                          # Included new geom
+                          geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               # Change X and Y axis labels
+                               x = "Years", 
+                               y = "Type I Attendances") 
+                          
+Axis_labels_plot
+```
+
+## Remove tick marks
+
+Using **theme (axis.ticks = element_blank())** function, to modify axis format
+
+``` {.r code-line-numbers="12-13"}
+Ticks_removed_dark <- AEATT_plot %>% 
+  select(period, type_1_Major_att) %>% 
+  ggplot(aes(x = period, y = type_1_Major_att)) +
+  geom_line(color="#0072CE", size=1,  linetype=1) +
+  # Included new geom
+  geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               x = "Period", 
+                               y = "Type I Attendances")  +
+           # Remove thick from x y axis plot, include theme dark
+  theme (axis.ticks = element_blank()) 
+
+
+Ticks_removed_dark
+```
+
+## Remove tick marks
+
+Function axis.ticks = element_blank() removed ticks from axes
+
+```{r echo=FALSE}
+Ticks_removed_dark <- AEATT_plot %>% 
+  select(period, type_1_Major_att) %>% 
+  ggplot(aes(x = period, y = type_1_Major_att)) +
+  geom_line(color="#0072CE", size=1,  linetype=1) +
+  # Included new geom
+  geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               x = "Period", 
+                               y = "Type I Attendances")  +
+           # Remove thick from x y axis plot, include theme dark
+  theme (axis.ticks = element_blank()) 
+
+
+Ticks_removed_dark
+```
+
+## Include themes
+
+There are several themes we can include in ggplot2: theme_bw(), theme_light(), theme_classic(), theme_dark().Themes in ggplot2 \<(https://ggplot2.tidyverse.org/reference/ggtheme.html)\>
+
+``` {.r code-line-numbers="13-14"}
+TypeI_theme_light  <- AEATT_plot %>% 
+  select(period, type_1_Major_att) %>% 
+  ggplot(aes(x = period, y = type_1_Major_att)) +
+  geom_line(color="#0072CE", size=1,  linetype=1) +
+  # Included new geom
+  geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               # Change X and Y axis labels
+                               x = "Period", 
+                               y = "Type I Attendances") +
+  theme (axis.ticks = element_blank()) +   # Included blank theme for axis
+  theme_light()    # Include theme_light
+
+TypeI_theme_light
+```
+
+## Include themes
+
+We have used theme_dark() in this plot below:
+
+```{r echo=FALSE}
+TypeI_theme_light  <- AEATT_plot %>% 
+  select(period, type_1_Major_att) %>% 
+  ggplot(aes(x = period, y = type_1_Major_att)) +
+  geom_line(color="#0072CE", size=1,  linetype=1) +
+  # Included new geom
+  geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               # Change X and Y axis labels
+                               x = "Period", 
+                               y = "Type I Attendances") +
+  theme (axis.ticks = element_blank()) +   # Included blank theme for axis
+  theme_dark()    # Include theme_light
+
+TypeI_theme_light
+```
+
+## Arrange plots in a grid
+
+Using grid.arrange() function from gridExtra library, you can create several ggplot2 plots and then send the output to a single image file. Useful for publications.
+
+``` {.r code-line-numbers="2-3"}
+library(gridExtra)
+GRID_PLOT <- grid.arrange(Ticks_removed_dark,
+             TypeI_theme_light,
+             ncol=2)
+```
+
+## Arrange them in a grid
+
+We can combine all these charts into a single output image:
+
+```{r echo=TRUE}
+# Arrange all plots into a single image using grid-arrange()
+library(gridExtra)
+GRID_PLOT <- grid.arrange(Ticks_removed_dark,
+             TypeI_theme_light,
+             ncol=2)
+```
+
+## Modify continuous Y axis
+
+We can modify y continuous axis using **scale_y\_continuous**, adding limits and breaks to it
+
+``` {.r code-line-numbers="13-15"}
+TypeI_cont_y_axis  <- AEATT_plot %>% 
+                          select(period, type_1_Major_att) %>% 
+                          ggplot(aes(x = period, y = type_1_Major_att)) +
+                          geom_line(color="#0072CE", size=1,  linetype=1) +
+                          # Included new geom
+                          geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               # Change X and Y axis labels
+                               x = "Period", 
+                               y = "Type I Attendances") +
+                          theme (axis.ticks = element_blank()) +
+                          theme_light() +
+                          # Define new y axis breaks (min, max and numbe of breaks between those values)
+                          scale_y_continuous(limits=c(1010000, 1400000),n.breaks=12)
+
+TypeI_cont_y_axis
+```
+
+## Modify continuous Y axis
+
+```{r echo=FALSE}
+TypeI_cont_y_axis  <- AEATT_plot %>% 
+                          select(period, type_1_Major_att) %>% 
+                          ggplot(aes(x = period, y = type_1_Major_att)) +
+                          geom_line(color="#0072CE", size=1,  linetype=1) +
+                          # Included new geom
+                          geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               # Change X and Y axis labels
+                               x = "Period", 
+                               y = "Type I Attendances") +
+                          theme (axis.ticks = element_blank()) +
+                          theme_light() +
+                          # Define new y axis breaks (min, max and numbe of breaks between those values)
+                          scale_y_continuous(limits=c(1010000, 1400000),n.breaks=12)
+
+TypeI_cont_y_axis
+```
+
+## Add a smooth line to the line chart
+
+Usgin geom_smooth() function to add a smoothing function. Specify the Smoothing method (function) to use, accepts either NULL or a character vector, e.g. "lm", "glm", "gam", "loess" or a function. See function details in Help R menu.
+
+``` {.r code-line-numbers="16-18"}
+TypeI_smooth_line   <- AEATT_plot %>% 
+  select(period, type_1_Major_att) %>% 
+  ggplot(aes(x = period, y = type_1_Major_att)) +
+  geom_line(color="#0072CE", size=1,  linetype=1) +
+  # Included new geom
+  geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               # Change X and Y axis labels
+                               x = "Period", 
+                               y = "Type I Attendances") +
+  theme (axis.ticks = element_blank()) +
+  theme_light() +
+  # Define new y axis breaks (min, max and numbe of breaks between those values)
+  scale_y_continuous(limits=c(1010000, 1400000),n.breaks=12) +
+  # Add a smooth line to the plot
+  geom_smooth()
+
+TypeI_smooth_line
+```
+
+## Add a smooth line to the line chart
+
+The smooth line has been added to the previous line chart with
+
+```{r echo=FALSE}
+TypeI_smooth_line   <- AEATT_plot %>% 
+  select(period, type_1_Major_att) %>% 
+  ggplot(aes(x = period, y = type_1_Major_att)) +
+  geom_line(color="#0072CE", size=1,  linetype=1) +
+  # Included new geom
+  geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               # Change X and Y axis labels
+                               x = "Period", 
+                               y = "Type I Attendances") +
+  theme (axis.ticks = element_blank()) +
+  theme_light() +
+  # Define new y axis breaks (min, max and numbe of breaks between those values)
+  scale_y_continuous(limits=c(1010000, 1400000),n.breaks=12) +
+  # Add a smooth line to the plot
+  geom_smooth()
+
+TypeI_smooth_line
+```
+
+## Tailor smooth line
+
+We can control for the amount of smoothing using span function and add Confidence Interval shadowed area (95CI)
+
+``` {.r code-line-numbers="17-18"}
+Tailored_smooth_line   <- AEATT_plot %>% 
+  select(period, type_1_Major_att) %>% 
+  ggplot(aes(x = period, y = type_1_Major_att)) +
+  geom_line(color="#0072CE", size=1,  linetype=1) +
+  # Included new geom
+  geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               # Change X and Y axis labels
+                               x = "Period", 
+                               y = "Type I Attendances")+
+  theme (axis.ticks = element_blank()) +
+  theme_light() +
+  # Define new y axis breaks (min, max and numbe of breaks between those values)
+  scale_y_continuous(limits=c(1010000, 1400000),n.breaks=12) +
+  # Add a smooth line to the plot
+  geom_smooth(span = 0.1, se = TRUE, size = 0.8)
+
+Tailored_smooth_line
+```
+
+## Tailor smooth line
+
+Now the shadowed area has changed from the default provided by geom_smooth() function.
+
+```{r echo=FALSE}
+Tailored_smooth_line   <- AEATT_plot %>% 
+  select(period, type_1_Major_att) %>% 
+  ggplot(aes(x = period, y = type_1_Major_att)) +
+  geom_line(color="#0072CE", size=1,  linetype=1) +
+  # Included new geom
+  geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               # Change X and Y axis labels
+                               x = "Period", 
+                               y = "Type I Attendances")+
+  theme (axis.ticks = element_blank()) +
+  theme_light() +
+  # Define new y axis breaks (min, max and numbe of breaks between those values)
+  scale_y_continuous(limits=c(1010000, 1400000),n.breaks=12) +
+  # Add a smooth line to the plot
+  geom_smooth(span = 0.1, se = TRUE, size = 0.8)
+
+Tailored_smooth_line
+```
+
+## Final theme combining several options
+
+There are many other options you could add to customize further your plot
+
+``` {.r code-line-numbers="17-18"}
+TypeI_title_format   <- AEATT_plot %>% 
+  select(period, type_1_Major_att) %>% 
+  ggplot(aes(x = period, y = type_1_Major_att)) +
+  geom_line(color="#0072CE", size=1,  linetype=1) +
+  # Included new geom
+  geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               # Change X and Y axis labels
+                               x = "Period", 
+                               y = "Type I Attendances") +
+  theme_light() +
+  geom_smooth(se = TRUE, span = 0.1) +
+  theme(
+    axis.ticks = element_blank(),
+    # A value of “plot” means the titles/caption are aligned to the entire plot
+    # Apply format to title plot
+    plot.title.position = "plot", 
+    plot.title = element_text(margin = margin (b=10), colour = "steelblue1", face = "bold"), # Skyblue1 colour
+    # Apply format to sub-title
+    plot.subtitle = element_text(
+      size =8, colour = "#0072CE", face = "bold")
+  ) 
+TypeI_title_format
+```
+
+## Final theme combining several options
+
+```{r echo=FALSE}
+TypeI_title_format   <- AEATT_plot %>% 
+  select(period, type_1_Major_att) %>% 
+  ggplot(aes(x = period, y = type_1_Major_att)) +
+  geom_line(color="#0072CE", size=1,  linetype=1) +
+  # Included new geom
+  geom_point(fill="#00A9CE",shape=21,show.legend = FALSE) +
+               labs(title = "A&E Attendances in England:Type 1- Major A&E, 2010-2019",
+                       subtitle ="NHSEngland",
+                       caption = "Sourc:https://www.england.nhs.uk/statistics/statistical-work-areas/ae-waiting-times-and-activity/",
+                               # Change X and Y axis labels
+                               x = "Period", 
+                               y = "Type I Attendances") +
+  theme_light() +
+  geom_smooth(se = TRUE, span = 0.1) +
+  theme(
+    axis.ticks = element_blank(),
+    # A value of “plot” means the titles/caption are aligned to the entire plot
+    # Apply format to title plot
+    plot.title.position = "plot", 
+    plot.title = element_text(margin = margin (b=10), colour = "steelblue1", face = "bold"), # Skyblue1 colour
+    # Apply format to sub-title
+    plot.subtitle = element_text(
+      size =8, colour = "#0072CE", face = "bold")
+  ) 
+TypeI_title_format
+```
+
+## Resources
+
+This presentation only covers a handful of options, please check this repo for facets and grid options
+
+-   Ggplot2 plots: <https://github.com/Pablo-source/ggplot2-visualizations>
+-   Cara Thompson.Variations on a ggtheme: <https://carathompson.com/talks/nhsr2022-ggplot-themes>
+-   The R Graph Gallery: <https://r-graph-gallery.com/>
+-   NHS England R Community: <https://nhsengland.github.io/nhs-r-reporting/>
+-   NHS Colour Guidelines: <https://nhsengland.github.io/nhs-r-reporting/tutorials/nhs-colours.html>
+-   Any questions? pablo.leonrodenas\@nhs.net
